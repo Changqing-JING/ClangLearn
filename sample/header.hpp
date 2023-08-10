@@ -1,8 +1,12 @@
-class MyClass {
-public:
-  int field;
-  virtual void method() const = 0;
+#pragma once
 
-  static const int static_field;
-  static int static_method();
-};
+/**
+ * @brief Allows subscribe
+ * @param jobId The ID of the job to subscribe to its events.
+ * @param callbackIndex Index of the callback to be executed to forward events.
+ * @param userData User parameter passed as-is to the callback.
+ */
+extern void subscribeEvents(const int jobId,
+                               void (*callbackIndex)(int userData),
+                               const int userData);
+
