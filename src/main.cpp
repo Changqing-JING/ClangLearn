@@ -3,11 +3,11 @@
 #include <iostream>
 #include <sstream>
 
+#include "clang/AST/CommentVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendAction.h"
-#include "clang/AST/CommentVisitor.h"
 
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
@@ -23,14 +23,57 @@ public:
   DeclVisitor(clang::SourceManager &SourceManager) : SourceManager(SourceManager) {
   }
 
-  bool VisitNamedDecl(clang::NamedDecl *NamedDecl) {
-    std::cout << "Found " << NamedDecl->getQualifiedNameAsString() << " at "
-              << "\n";
-    const clang::comments::FullComment *Comment =
-              NamedDecl->getASTContext().getLocalCommentForDeclUncached(NamedDecl);
-    if(Comment){
+  bool VisitDecl(clang::Decl *decl) {
+
+    const clang::comments::FullComment *Comment = decl->getASTContext().getLocalCommentForDeclUncached(decl);
+    if (Comment) {
       Comment->dump();
     }
+
+    const clang::Decl::Kind kind = decl->getKind();
+
+    switch (kind) {
+    case (clang::Decl::Kind::Function): {
+      clang::NamedDecl *const namedDecl = dynamic_cast<clang::NamedDecl *>(decl);
+      std::cout << "Found function " << namedDecl->getQualifiedNameAsString() <<std::endl;
+      break;
+    }
+    case(clang::Decl::Kind::ParmVar):{
+      clang::NamedDecl *const namedDecl = dynamic_cast<clang::NamedDecl *>(decl);
+      clang::VarDecl* const valDecl =  dynamic_cast<clang::VarDecl *>(decl);
+      clang::QualType const variableType = valDecl->getType();
+      
+      
+      std::cout << "Found parameter " << namedDecl->getQualifiedNameAsString() ;
+
+      if(variableType->isBuiltinType()){
+        const clang::BuiltinType* builtinType = variableType->castAs<clang::BuiltinType>();
+        if(builtinType->getKind() == clang::BuiltinType::Int){
+          std::cout<<"type int ";
+        }
+        if(builtinType->getKind() == clang::BuiltinType::UInt){
+          std::cout<<"type uint ";
+        }
+      }
+
+      clang::Qualifiers const qualifier = variableType.getQualifiers();
+
+      if(qualifier.hasConst()){
+        std::cout<<"const ";
+      }
+
+      
+
+      std::cout<<std::endl;
+      break;
+    }
+    default:{
+
+    }
+
+   
+    }
+
     return true;
   }
 

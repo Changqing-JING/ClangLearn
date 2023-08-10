@@ -8,5 +8,5 @@
  */
 extern void subscribeEvents(const int jobId,
                                void (*callbackIndex)(int userData),
-                               const int userData);
+                               const unsigned int userData);
 

@@ -16,3 +16,8 @@ clang -Xclang -ast-dump -fsyntax-only ./sample/header.hpp
 ```shell
 clang-check -ast-dump sample/header.hpp  --extra-arg=-fparse-all-comments
 ```
+
+### use clang to dump AST
+```shell
+clang -fsyntax-only -Xclang -ast-dump=json -Xclang -fparse-all-comments sample/header.hpp  > ast.json
+```
