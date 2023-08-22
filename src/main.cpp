@@ -35,43 +35,37 @@ public:
     switch (kind) {
     case (clang::Decl::Kind::Function): {
       clang::NamedDecl *const namedDecl = dynamic_cast<clang::NamedDecl *>(decl);
-      std::cout << "Found function " << namedDecl->getQualifiedNameAsString() <<std::endl;
+      std::cout << "Found function " << namedDecl->getQualifiedNameAsString() << std::endl;
       break;
     }
-    case(clang::Decl::Kind::ParmVar):{
+    case (clang::Decl::Kind::ParmVar): {
       clang::NamedDecl *const namedDecl = dynamic_cast<clang::NamedDecl *>(decl);
-      clang::VarDecl* const valDecl =  dynamic_cast<clang::VarDecl *>(decl);
+      clang::VarDecl *const valDecl = dynamic_cast<clang::VarDecl *>(decl);
       clang::QualType const variableType = valDecl->getType();
-      
-      
-      std::cout << "Found parameter " << namedDecl->getQualifiedNameAsString() ;
 
-      if(variableType->isBuiltinType()){
-        const clang::BuiltinType* builtinType = variableType->castAs<clang::BuiltinType>();
-        if(builtinType->getKind() == clang::BuiltinType::Int){
-          std::cout<<"type int ";
+      std::cout << "Found parameter " << namedDecl->getQualifiedNameAsString() << " ";
+
+      if (variableType->isBuiltinType()) {
+        const clang::BuiltinType *builtinType = variableType->castAs<clang::BuiltinType>();
+        if (builtinType->getKind() == clang::BuiltinType::Int) {
+          std::cout << "type int ";
         }
-        if(builtinType->getKind() == clang::BuiltinType::UInt){
-          std::cout<<"type uint ";
+        if (builtinType->getKind() == clang::BuiltinType::UInt) {
+          std::cout << "type uint ";
         }
       }
 
       clang::Qualifiers const qualifier = variableType.getQualifiers();
 
-      if(qualifier.hasConst()){
-        std::cout<<"const ";
+      if (qualifier.hasConst()) {
+        std::cout << "const ";
       }
 
-      
-
-      std::cout<<std::endl;
+      std::cout << std::endl;
       break;
     }
-    default:{
-
+    default: {
     }
-
-   
     }
 
     return true;
