@@ -23,35 +23,36 @@
 class DeclVisitor : public clang::RecursiveASTVisitor<DeclVisitor> {
 
 public:
-  DeclVisitor(clang::SourceManager &SourceManager) : SourceManager(SourceManager) {
+  explicit DeclVisitor(clang::SourceManager &SourceManager) noexcept : SourceManager(SourceManager) {
   }
 
-  bool VisitDecl(clang::Decl *decl) {
+  bool VisitFunctionDecl(clang::FunctionDecl *functionDecl) const {
 
-    const clang::comments::FullComment *Comment = decl->getASTContext().getLocalCommentForDeclUncached(decl);
-    if (Comment) {
-      Comment->dump();
+    dumpComment(functionDecl);
+
+    std::cout << "Found function " << functionDecl->getQualifiedNameAsString() << std::endl;
+    clang::AttrVec attrs = functionDecl->getAttrs();
+
+    for (uint32_t i = 0; i < attrs.size(); i++) {
+      clang::Attr *attr = attrs[i];
+      std::cout << attr->getAttrName()->getName().str() << std::endl;
     }
+
+    uint32_t const numParams = functionDecl->getNumParams();
+    std::cout << "with num of args " << numParams << std::endl;
+    for (uint32_t i = 0; i < numParams; i++) {
+      clang::ParmVarDecl const *const parameterDecl = functionDecl->getParamDecl(i);
+      dumpParameter(parameterDecl);
+    }
+
+    return true;
+  }
+  bool VisitDecl(clang::Decl *decl) {
 
     const clang::Decl::Kind kind = decl->getKind();
 
     switch (kind) {
-    case (clang::Decl::Kind::Function): {
-      clang::FunctionDecl const *const functionDecl = static_cast<clang::FunctionDecl *>(decl);
-      std::cout << "Found function " << functionDecl->getQualifiedNameAsString() << std::endl;
-      uint32_t const numParams = functionDecl->getNumParams();
-      std::cout << "with num of args " << numParams << std::endl;
-      for (uint32_t i = 0; i < numParams; i++) {
-        clang::ParmVarDecl const *const parameterDecl = functionDecl->getParamDecl(i);
-        visitParameter(parameterDecl);
-      }
 
-      return false;
-    }
-    case (clang::Decl::Kind::ParmVar): {
-      assert(false);
-      break;
-    }
     default: {
     }
     }
@@ -59,29 +60,23 @@ public:
     return true;
   }
 
-  void visitParameter(clang::ParmVarDecl const *const parameterDecl) {
+  bool VisitEnumDecl(clang::EnumDecl *enumDecl) const {
+    if (enumDecl->isScoped()) { // Check if the enum is a scoped enum (enum class).
+      // Do something with the enum class declaration.
+      std::cout << "Found enum class: " << enumDecl->getNameAsString() << std::endl;
 
-    clang::QualType const variableType = parameterDecl->getType();
+      // If you also want to visit each enumerator of the enum class, you can do that here.
+      for (clang::EnumConstantDecl *enumerator : enumDecl->enumerators()) {
+        std::cout << "  Enumerator: " << enumerator->getNameAsString();
+        llvm::APSInt value = enumerator->getInitVal();
 
-    std::cout << "Found parameter " << parameterDecl->getQualifiedNameAsString() << " ";
-
-    if (variableType->isBuiltinType()) {
-      const clang::BuiltinType *builtinType = variableType->castAs<clang::BuiltinType>();
-      if (builtinType->getKind() == clang::BuiltinType::Int) {
-        std::cout << "type int ";
-      }
-      if (builtinType->getKind() == clang::BuiltinType::UInt) {
-        std::cout << "type uint ";
+        // Print the value
+        std::cout << " = " << value.getExtValue() << std::endl;
       }
     }
 
-    clang::Qualifiers const qualifier = variableType.getQualifiers();
-
-    if (qualifier.hasConst()) {
-      std::cout << "const ";
-    }
-
-    std::cout << std::endl;
+    // Return true to continue visiting other nodes in the AST.
+    return true;
   }
 
 private:
@@ -90,6 +85,95 @@ private:
     std::ostringstream OSS;
     OSS << SourceManager.getFilename(Loc).str() << ":" << SourceManager.getSpellingLineNumber(Loc) << ":" << SourceManager.getSpellingColumnNumber(Loc);
     return OSS.str();
+  }
+
+  static void dumpParameter(clang::ParmVarDecl const *const parameterDecl) {
+
+    clang::QualType const variableType = parameterDecl->getType();
+
+    std::cout << "Found parameter " << parameterDecl->getQualifiedNameAsString() << " ";
+
+    clang::Qualifiers const qualifier = variableType.getQualifiers();
+
+    if (qualifier.hasConst()) {
+      std::cout << "const ";
+    }
+
+    switch (variableType->getTypeClass()) {
+    case (clang::Type::TypeClass::Builtin): {
+      const clang::BuiltinType *const builtinType = variableType->castAs<clang::BuiltinType>();
+      dumpBuiltinType(builtinType);
+      break;
+    }
+    case (clang::Type::TypeClass::Pointer): {
+      std::cout << "type pointer ";
+      const clang::PointerType *const pointerType = variableType->castAs<clang::PointerType>();
+      if (pointerType->isFunctionPointerType()) {
+        std::cout << "to function ";
+      }
+      break;
+    }
+    case (clang::Type::TypeClass::Typedef): {
+      const clang::TypedefType *const typeDef = variableType->castAs<clang::TypedefType>();
+      clang::QualType underLayerType = typeDef->desugar();
+
+      while (underLayerType->isTypedefNameType()) {
+        assert(underLayerType->getTypeClass() == clang::Type::TypeClass::Typedef);
+        underLayerType = underLayerType->castAs<clang::TypedefType>()->desugar();
+      }
+      if (underLayerType->isBuiltinType()) {
+        const clang::BuiltinType *const builtinType = underLayerType->castAs<clang::BuiltinType>();
+        dumpBuiltinType(builtinType);
+      } else {
+        std::cout << "unsupported type";
+      }
+
+      break;
+    }
+    case (clang::Type::TypeClass::Elaborated): {
+      std::cout << "type Elaborated ";
+      const clang::ElaboratedType *const elaboratedType = variableType->castAs<clang::ElaboratedType>();
+      clang::CXXRecordDecl *decl = elaboratedType->getAsCXXRecordDecl();
+      std::cout << decl->getName().str();
+      break;
+    }
+    default: {
+      break;
+    }
+    }
+
+    std::cout << std::endl;
+  }
+
+  static void dumpBuiltinType(clang::BuiltinType const *const builtinType) {
+    switch (builtinType->getKind()) {
+    case (clang::BuiltinType::Int): {
+      std::cout << "type int ";
+      break;
+    }
+    case (clang::BuiltinType::UInt): {
+      std::cout << "type uint ";
+      break;
+    }
+    case (clang::BuiltinType::ULong): {
+      std::cout << "type ulong ";
+      break;
+    }
+    case (clang::BuiltinType::ULongLong): {
+      std::cout << "type ULongLong ";
+      break;
+    }
+    default: {
+      break;
+    }
+    }
+  }
+
+  static void dumpComment(clang::Decl const *const decl) {
+    const clang::comments::FullComment *Comment = decl->getASTContext().getLocalCommentForDeclUncached(decl);
+    if (Comment) {
+      Comment->dump();
+    }
   }
 };
 
@@ -113,10 +197,6 @@ public:
     }
   }
 };
-
-namespace clang {
-class ASTConsumer;
-}
 
 class DeclFindingAction : public clang::ASTFrontendAction {
 public:
@@ -142,7 +222,7 @@ llvm::cl::OptionCategory FindDeclCategory("find-decl options");
 
 int main(int argc, const char **argv) {
 
-  std::array<std::string, 1U> args{"-std=c++20"};
+  std::array<std::string, 2U> args{"-std=c++20", "--target=wasm32"};
 
   // The source file(s) you wish to parse.
   std::vector<std::string> sourcePaths = {argv[1]};
