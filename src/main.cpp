@@ -1,7 +1,10 @@
 #include <array>
+#include <cassert>
 #include <clang-c/Index.h>
+#include <cstdint>
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 #include "clang/AST/CommentVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -34,34 +37,19 @@ public:
 
     switch (kind) {
     case (clang::Decl::Kind::Function): {
-      clang::NamedDecl *const namedDecl = dynamic_cast<clang::NamedDecl *>(decl);
-      std::cout << "Found function " << namedDecl->getQualifiedNameAsString() << std::endl;
-      break;
+      clang::FunctionDecl const *const functionDecl = static_cast<clang::FunctionDecl *>(decl);
+      std::cout << "Found function " << functionDecl->getQualifiedNameAsString() << std::endl;
+      uint32_t const numParams = functionDecl->getNumParams();
+      std::cout << "with num of args " << numParams << std::endl;
+      for (uint32_t i = 0; i < numParams; i++) {
+        clang::ParmVarDecl const *const parameterDecl = functionDecl->getParamDecl(i);
+        visitParameter(parameterDecl);
+      }
+
+      return false;
     }
     case (clang::Decl::Kind::ParmVar): {
-      clang::NamedDecl *const namedDecl = dynamic_cast<clang::NamedDecl *>(decl);
-      clang::VarDecl *const valDecl = dynamic_cast<clang::VarDecl *>(decl);
-      clang::QualType const variableType = valDecl->getType();
-
-      std::cout << "Found parameter " << namedDecl->getQualifiedNameAsString() << " ";
-
-      if (variableType->isBuiltinType()) {
-        const clang::BuiltinType *builtinType = variableType->castAs<clang::BuiltinType>();
-        if (builtinType->getKind() == clang::BuiltinType::Int) {
-          std::cout << "type int ";
-        }
-        if (builtinType->getKind() == clang::BuiltinType::UInt) {
-          std::cout << "type uint ";
-        }
-      }
-
-      clang::Qualifiers const qualifier = variableType.getQualifiers();
-
-      if (qualifier.hasConst()) {
-        std::cout << "const ";
-      }
-
-      std::cout << std::endl;
+      assert(false);
       break;
     }
     default: {
@@ -69,6 +57,31 @@ public:
     }
 
     return true;
+  }
+
+  void visitParameter(clang::ParmVarDecl const *const parameterDecl) {
+
+    clang::QualType const variableType = parameterDecl->getType();
+
+    std::cout << "Found parameter " << parameterDecl->getQualifiedNameAsString() << " ";
+
+    if (variableType->isBuiltinType()) {
+      const clang::BuiltinType *builtinType = variableType->castAs<clang::BuiltinType>();
+      if (builtinType->getKind() == clang::BuiltinType::Int) {
+        std::cout << "type int ";
+      }
+      if (builtinType->getKind() == clang::BuiltinType::UInt) {
+        std::cout << "type uint ";
+      }
+    }
+
+    clang::Qualifiers const qualifier = variableType.getQualifiers();
+
+    if (qualifier.hasConst()) {
+      std::cout << "const ";
+    }
+
+    std::cout << std::endl;
   }
 
 private:
@@ -129,10 +142,14 @@ llvm::cl::OptionCategory FindDeclCategory("find-decl options");
 
 int main(int argc, const char **argv) {
 
-  llvm::Expected<clang::tooling::CommonOptionsParser> option = clang::tooling::CommonOptionsParser::create(argc, argv, FindDeclCategory);
+  std::array<std::string, 1U> args{"-std=c++20"};
 
-  auto files = option->getSourcePathList();
-  clang::tooling::ClangTool tool(option->getCompilations(), files);
+  // The source file(s) you wish to parse.
+  std::vector<std::string> sourcePaths = {argv[1]};
+
+  // Manually set up the CompilationDatabase and SourcePathList.
+  clang::tooling::FixedCompilationDatabase compilations(".", args);
+  clang::tooling::ClangTool tool(compilations, sourcePaths);
 
   return tool.run(clang::tooling::newFrontendActionFactory<DeclFindingAction>().get());
 }

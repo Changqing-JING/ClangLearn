@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 project(ClangLearn)
 
 
-find_package(LLVM REQUIRED)
+find_package(LLVM 14 REQUIRED )
 
 
 aux_source_directory(src sourceFiles)
